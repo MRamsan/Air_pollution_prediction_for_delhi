@@ -1,0 +1,9 @@
+streamlit
+pandas
+numpy
+plotly
+sqlalchemy
+joblib
+scikit-learn
+xgboost
+tensorflow   # only if you use GRU/SLTM .h5 models
