@@ -300,86 +300,269 @@ def generate_recommendations(forecast_data, site, pollutant):
 
 def answer_question(question, forecast_data, site, pollutant):
     """Simple rule-based chatbot to answer questions"""
-    question_lower = question.lower()
+    question_lower = question.lower().strip()
     
     # Greetings
     if any(word in question_lower for word in ["hello", "hi", "hey", "greetings"]):
         return "Hello! 👋 I'm your air quality assistant. I can help you understand the forecast and provide health recommendations. Ask me anything about the air quality predictions!"
     
-    # What questions
-    if "what is" in question_lower or "what are" in question_lower:
+    # What is O3/NO2
+    if ("what is" in question_lower or "what are" in question_lower or "tell me about" in question_lower):
         if "o3" in question_lower or "ozone" in question_lower:
-            return "**Ozone (O3)** is a gas composed of three oxygen atoms. Ground-level ozone is created by chemical reactions between nitrogen oxides and volatile organic compounds in the presence of sunlight. It can cause respiratory problems, especially during hot weather."
-        elif "no2" in question_lower or "nitrogen dioxide" in question_lower:
-            return "**Nitrogen Dioxide (NO2)** is a reddish-brown gas formed from vehicle emissions and industrial processes. It can irritate airways, aggravate respiratory diseases, and contribute to the formation of smog and acid rain."
-    
-    # When questions
-    if forecast_data is not None:
-        if "when" in question_lower and ("best" in question_lower or "safe" in question_lower):
-            min_hour = forecast_data[f"{pollutant} (µg/m³)"].idxmin() + 1
-            min_value = forecast_data[f"{pollutant} (µg/m³)"].min()
-            return f"The best time for outdoor activities is around **Hour {min_hour}** when {pollutant} levels are lowest at **{min_value:.2f} µg/m³**."
+            return """**Ozone (O3)** is a gas composed of three oxygen atoms. 
+
+🔬 **Formation:** Created by chemical reactions between nitrogen oxides and volatile organic compounds in sunlight.
+
+⚠️ **Health Effects:**
+- Respiratory problems
+- Aggravates asthma
+- Reduces lung function
+- Worse during hot, sunny days
+
+🌡️ **Peak Times:** Usually highest in afternoon (12 PM - 6 PM) when sunlight is strongest."""
         
-        if "when" in question_lower and ("worst" in question_lower or "avoid" in question_lower or "peak" in question_lower):
-            max_hour = forecast_data[f"{pollutant} (µg/m³)"].idxmax() + 1
+        elif "no2" in question_lower or "nitrogen dioxide" in question_lower:
+            return """**Nitrogen Dioxide (NO2)** is a reddish-brown gas.
+
+🚗 **Sources:** 
+- Vehicle emissions (main source)
+- Industrial processes
+- Power plants
+
+⚠️ **Health Effects:**
+- Irritates airways
+- Aggravates respiratory diseases
+- Increases susceptibility to infections
+- Contributes to smog and acid rain
+
+🕐 **Peak Times:** Usually highest during rush hours (7-10 AM, 5-8 PM)."""
+    
+    # Check if forecast exists for timing questions
+    if forecast_data is None and any(word in question_lower for word in ["when", "time", "hour", "best", "worst", "peak"]):
+        return "⚠️ Please run a forecast first in the **Forecast tab**, then I can tell you the best and worst times based on actual predictions."
+    
+    # Best time questions
+    if forecast_data is not None:
+        if any(phrase in question_lower for phrase in ["best time", "when should i go", "when can i go", "safe time", "when is it safe"]):
+            min_hour = int(forecast_data[f"{pollutant} (µg/m³)"].idxmin()) + 1
+            min_value = forecast_data[f"{pollutant} (µg/m³)"].min()
+            max_hour = int(forecast_data[f"{pollutant} (µg/m³)"].idxmax()) + 1
             max_value = forecast_data[f"{pollutant} (µg/m³)"].max()
-            return f"Avoid outdoor activities around **Hour {max_hour}** when {pollutant} levels peak at **{max_value:.2f} µg/m³**."
+            category, emoji = get_air_quality_category(min_value, pollutant)
+            
+            return f"""🕐 **Best Time for Outdoor Activities**
+
+✅ **Hour {min_hour}** - Lowest pollution at **{min_value:.2f} µg/m³** {emoji}
+
+❌ **Avoid Hour {max_hour}** - Highest pollution at **{max_value:.2f} µg/m³**
+
+💡 **Tip:** Plan outdoor activities around the lowest pollution hours for better health."""
+        
+        # Worst time questions
+        if any(phrase in question_lower for phrase in ["worst time", "when to avoid", "avoid going", "peak pollution", "highest pollution"]):
+            max_hour = int(forecast_data[f"{pollutant} (µg/m³)"].idxmax()) + 1
+            max_value = forecast_data[f"{pollutant} (µg/m³)"].max()
+            category, emoji = get_air_quality_category(max_value, pollutant)
+            
+            return f"""⚠️ **Peak Pollution Period**
+
+❌ **Hour {max_hour}** - Pollution peaks at **{max_value:.2f} µg/m³** {emoji}
+
+Air Quality: **{category}**
+
+🚫 **Recommendations:**
+- Avoid outdoor activities during this time
+- Keep windows closed
+- Stay indoors if you're in a sensitive group"""
     
-    # Health questions
-    if "health" in question_lower or "safe" in question_lower or "risk" in question_lower:
+    # Exercise questions
+    if any(word in question_lower for word in ["exercise", "workout", "run", "jog", "sport", "play", "gym"]):
         if forecast_data is not None:
-            return generate_recommendations(forecast_data, site, pollutant)
+            avg_value = forecast_data[f"{pollutant} (µg/m³)"].mean()
+            category, emoji = get_air_quality_category(avg_value, pollutant)
+            min_hour = int(forecast_data[f"{pollutant} (µg/m³)"].idxmin()) + 1
+            
+            if category in ["Good", "Moderate"]:
+                return f"""{emoji} **Yes, outdoor exercise is generally safe!**
+
+📊 Air Quality: **{category}**
+📈 Average {pollutant}: {avg_value:.2f} µg/m³
+
+✅ **Recommendations:**
+- Best time: Hour {min_hour}
+- Stay hydrated
+- Avoid high-traffic areas
+- Monitor how you feel
+
+⚠️ If you have asthma or respiratory issues, consider morning hours when pollution is lowest."""
+            else:
+                return f"""{emoji} **Not recommended for outdoor exercise**
+
+📊 Air Quality: **{category}**
+📈 Average {pollutant}: {avg_value:.2f} µg/m³
+
+🏋️ **Better Options:**
+- Indoor gym/home workout
+- Yoga or stretching indoors
+- Wait for better air quality days
+
+⚠️ If you must go out:
+- Wear N95 mask
+- Avoid vigorous activity
+- Choose least polluted hour: Hour {min_hour}"""
         else:
-            return "Please run a forecast first, then I can provide personalized health recommendations based on the predicted air quality levels."
+            return "Please run a forecast first in the **Forecast tab** to get exercise recommendations based on air quality predictions."
     
-    # Recommendation questions
-    if "recommend" in question_lower or "should i" in question_lower or "can i" in question_lower:
+    # Mask questions
+    if "mask" in question_lower:
         if forecast_data is not None:
             avg_value = forecast_data[f"{pollutant} (µg/m³)"].mean()
             category, emoji = get_air_quality_category(avg_value, pollutant)
             
-            if "exercise" in question_lower or "run" in question_lower or "jog" in question_lower:
-                if category in ["Good", "Moderate"]:
-                    return f"{emoji} Yes, outdoor exercise is generally safe. Air quality is {category}. However, avoid peak pollution hours."
-                else:
-                    return f"{emoji} Not recommended. Air quality is {category}. Consider indoor exercise instead."
-            
-            if "mask" in question_lower:
-                if category in ["Unhealthy for Sensitive Groups", "Unhealthy", "Very Unhealthy"]:
-                    return f"✅ Yes, wearing an N95 or N99 mask is recommended. Air quality is {category}."
-                else:
-                    return f"Mask is optional. Air quality is {category}, which is generally safe."
-            
+            if category in ["Unhealthy for Sensitive Groups", "Unhealthy", "Very Unhealthy"]:
+                return f"""😷 **YES, wearing a mask is recommended**
+
+{emoji} Air Quality: **{category}**
+
+**Recommended Masks:**
+✅ N95 or N99 masks (filter 95-99% of particles)
+✅ KN95 masks (similar protection)
+❌ Surgical/cloth masks provide minimal protection
+
+**When to wear:**
+- Any outdoor activity
+- Commuting
+- Near traffic areas
+
+**Who should definitely wear:**
+- Children and elderly
+- People with respiratory conditions
+- Pregnant women"""
+            else:
+                return f"""😊 **Mask is optional**
+
+{emoji} Air Quality: **{category}**
+
+Air quality is acceptable. However, you may choose to wear one if:
+- You have respiratory sensitivity
+- You're near high-traffic areas
+- You feel more comfortable
+
+If you do wear one, N95 masks offer the best protection."""
+        else:
+            return "Please run a forecast first to get mask recommendations based on air quality levels."
+    
+    # Health/Safety/Risk questions
+    if any(word in question_lower for word in ["health", "safe", "risk", "danger", "precaution", "protect", "recommendation"]):
+        if forecast_data is not None:
             return generate_recommendations(forecast_data, site, pollutant)
         else:
-            return "Please run a forecast first to get personalized recommendations."
+            return "Please run a forecast first in the **Forecast tab**, then I can provide personalized health recommendations."
+    
+    # Children/kids questions
+    if any(word in question_lower for word in ["children", "kids", "child", "baby", "toddler"]):
+        if forecast_data is not None:
+            avg_value = forecast_data[f"{pollutant} (µg/m³)"].mean()
+            category, emoji = get_air_quality_category(avg_value, pollutant)
+            
+            return f"""👶 **Special Precautions for Children**
+
+{emoji} Current Air Quality: **{category}**
+
+**Why children are more vulnerable:**
+- Smaller lungs, breathe more air per body weight
+- Immune systems still developing
+- More time outdoors
+
+**Recommendations:**
+"""  + ("""
+✅ Safe for outdoor play
+✅ Ensure adequate hydration
+✅ Avoid high-traffic areas""" if category in ["Good", "Moderate"] else """
+⚠️ Limit outdoor time
+⚠️ Keep activities indoors
+⚠️ Close windows at home/school
+⚠️ Monitor for symptoms (coughing, breathing difficulty)
+
+🚫 Cancel outdoor sports/activities""") + """
+
+**Watch for symptoms:**
+- Coughing or wheezing
+- Difficulty breathing
+- Chest tightness
+- Consult doctor if symptoms persist"""
+        else:
+            return "Please run a forecast first to get recommendations for children's outdoor activities."
+    
+    # How to improve/reduce
+    if ("how" in question_lower and any(word in question_lower for word in ["improve", "reduce", "lower", "protect", "prevent"])):
+        return """🌱 **Ways to Reduce Air Pollution Exposure:**
+
+**At Home:**
+🏠 Use air purifiers with HEPA filters
+🪟 Keep windows closed during high pollution
+🌿 Indoor plants (snake plant, spider plant)
+🧹 Regular cleaning to remove dust
+
+**When Going Out:**
+😷 Wear N95 masks during high pollution
+🚇 Use public transport or carpool
+🚶 Avoid high-traffic routes
+⏰ Plan activities during low-pollution hours
+
+**Long-term Actions:**
+🚗 Reduce vehicle use
+🌳 Support tree planting initiatives
+♻️ Reduce, reuse, recycle
+💡 Use energy-efficient appliances
+
+**Health Monitoring:**
+📱 Check air quality daily
+💊 Keep medications handy (asthma)
+🏥 Regular health check-ups"""
     
     # Comparison questions
-    if forecast_data is not None:
-        if "compare" in question_lower or "difference" in question_lower:
-            avg_value = forecast_data[f"{pollutant} (µg/m³)"].mean()
-            return f"The average {pollutant} level for the next 24 hours at {site} is **{avg_value:.2f} µg/m³**. This can vary significantly throughout the day due to traffic patterns, weather, and industrial activity."
-    
-    # How questions
-    if "how" in question_lower:
-        if "improve" in question_lower or "reduce" in question_lower:
-            return """**Ways to reduce air pollution exposure:**
-1. Stay indoors during peak pollution hours (morning and evening rush)
-2. Use air purifiers with HEPA filters
-3. Keep windows closed when outdoor air quality is poor
-4. Use public transport or carpool
-5. Plant trees around your home
-6. Avoid exercising near high-traffic areas"""
-    
-    # Default response
-    return """I can help you with:
-- Understanding O3 and NO2 pollutants
-- Finding the best/worst times for outdoor activities
-- Health recommendations based on forecasts
-- Safety advice for exercise and outdoor activities
-- Ways to reduce pollution exposure
+    if forecast_data is not None and ("compare" in question_lower or "difference" in question_lower or "level" in question_lower):
+        avg_value = forecast_data[f"{pollutant} (µg/m³)"].mean()
+        max_value = forecast_data[f"{pollutant} (µg/m³)"].max()
+        min_value = forecast_data[f"{pollutant} (µg/m³)"].min()
+        category, emoji = get_air_quality_category(avg_value, pollutant)
+        
+        return f"""📊 **{pollutant} Forecast Analysis for {site}**
 
-Try asking: "When is the best time for outdoor activities?" or "What health precautions should I take?" """
+{emoji} **Overall:** {category}
+
+**Statistics:**
+- Average: {avg_value:.2f} µg/m³
+- Peak: {max_value:.2f} µg/m³ (Hour {int(forecast_data[f'{pollutant} (µg/m³)'].idxmax()) + 1})
+- Lowest: {min_value:.2f} µg/m³ (Hour {int(forecast_data[f'{pollutant} (µg/m³)'].idxmin()) + 1})
+- Variation: {max_value - min_value:.2f} µg/m³
+
+**Reference Levels (WHO Guidelines):**
+{'- Good: ≤50 µg/m³' if pollutant == 'O3' else '- Good: ≤40 µg/m³'}
+{'- Moderate: 51-100 µg/m³' if pollutant == 'O3' else '- Moderate: 41-80 µg/m³'}"""
+    
+    # Default - help message
+    return """I can help you with:
+
+❓ **Understanding Pollutants**
+- "What is O3?"
+- "Tell me about NO2"
+
+⏰ **Timing Questions**
+- "When is the best time to go outside?"
+- "When should I avoid outdoor activities?"
+
+🏃 **Activity Safety**
+- "Can I exercise outside?"
+- "Is it safe for children to play?"
+
+😷 **Health & Safety**
+- "Should I wear a mask?"
+- "What health precautions should I take?"
+- "How to reduce pollution exposure?"
+
+💡 **Tip:** Run a forecast first for personalized recommendations!"""
 
 # ============== MAIN UI ==============
 st.title("🌆 Delhi Air Quality Forecast & AI Assistant")
@@ -555,63 +738,104 @@ with tab2:
     st.markdown("### 💬 AI Air Quality Assistant")
     st.markdown("Ask me questions about air quality, health recommendations, and safety advice!")
     
+    # Display chat history first
+    chat_container = st.container()
+    with chat_container:
+        for message in st.session_state.chat_history:
+            if message["role"] == "user":
+                with st.chat_message("user"):
+                    st.markdown(message['content'])
+            else:
+                with st.chat_message("assistant"):
+                    st.markdown(message['content'])
+    
     # Quick action buttons
     st.markdown("**Quick Questions:**")
     col1, col2, col3 = st.columns(3)
     with col1:
         if st.button("🏃 Can I exercise outside?"):
+            question = "Can I exercise outside?"
             st.session_state.chat_history.append({
                 "role": "user",
-                "content": "Can I exercise outside?"
+                "content": question
             })
+            response = answer_question(
+                question, 
+                st.session_state.forecast_data,
+                st.session_state.current_site,
+                st.session_state.current_element
+            )
+            st.session_state.chat_history.append({
+                "role": "assistant",
+                "content": response
+            })
+            st.rerun()
+            
     with col2:
         if st.button("⏰ Best time to go out?"):
+            question = "When is the best time for outdoor activities?"
             st.session_state.chat_history.append({
                 "role": "user",
-                "content": "When is the best time for outdoor activities?"
+                "content": question
             })
+            response = answer_question(
+                question, 
+                st.session_state.forecast_data,
+                st.session_state.current_site,
+                st.session_state.current_element
+            )
+            st.session_state.chat_history.append({
+                "role": "assistant",
+                "content": response
+            })
+            st.rerun()
+            
     with col3:
         if st.button("💊 Health recommendations?"):
+            question = "What health recommendations do you have?"
             st.session_state.chat_history.append({
                 "role": "user",
-                "content": "What health recommendations do you have?"
+                "content": question
             })
+            response = answer_question(
+                question, 
+                st.session_state.forecast_data,
+                st.session_state.current_site,
+                st.session_state.current_element
+            )
+            st.session_state.chat_history.append({
+                "role": "assistant",
+                "content": response
+            })
+            st.rerun()
     
-    # Display chat history
-    chat_container = st.container()
-    with chat_container:
-        for message in st.session_state.chat_history:
-            if message["role"] == "user":
-                st.markdown(f"**You:** {message['content']}")
-            else:
-                st.markdown(f"**Assistant:** {message['content']}")
-    
-    # Chat input
-    user_question = st.text_input("Ask a question:", placeholder="e.g., What precautions should I take?", key="chat_input")
-    
-    if st.button("Send", type="primary") or user_question:
-        if user_question:
-            # Add user message to history
+    # Chat input using form to prevent auto-rerun
+    with st.form(key="chat_form", clear_on_submit=True):
+        user_question = st.text_input("Ask a question:", placeholder="e.g., What precautions should I take?")
+        submit_button = st.form_submit_button("Send 💬")
+        
+        if submit_button and user_question.strip():
+            # Add user message
             st.session_state.chat_history.append({
                 "role": "user",
-                "content": user_question
+                "content": user_question.strip()
             })
             
             # Generate response
             response = answer_question(
-                user_question, 
+                user_question.strip(), 
                 st.session_state.forecast_data,
                 st.session_state.current_site,
                 st.session_state.current_element
             )
             
-            # Add assistant response to history
+            # Add assistant response
             st.session_state.chat_history.append({
                 "role": "assistant",
                 "content": response
             })
             
-            # Rerun to update chat display
+            # Rerun to show new messages
             st.rerun()
     
     # Clear chat button
