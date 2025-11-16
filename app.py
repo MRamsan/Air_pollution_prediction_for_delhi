@@ -14,7 +14,6 @@ SITE_NAMES = [
     "Patparganj", "Pooth Khurd", "Gokulpuri"
 ]
 SITE_TO_NUM = {name: i+1 for i, name in enumerate(SITE_NAMES)}
-MODEL_NAMES = ["LSTM"]  # Running only LSTM for now
 METRIC_NAMES = ["O3", "NO2"]
 
 # -------------------------------
@@ -23,7 +22,6 @@ METRIC_NAMES = ["O3", "NO2"]
 st.title("Delhi Air Pollution Forecaster")
 
 site_choice = st.sidebar.selectbox("Select Site:", SITE_NAMES)
-model_choice = st.sidebar.selectbox("Select Model:", MODEL_NAMES)
 element_choice = st.sidebar.selectbox("Select Element:", METRIC_NAMES)
 
 # -------------------------------
@@ -51,26 +49,23 @@ model = load_model(model_path, compile=False)
 with open(scaler_path, 'rb') as f:
     scaler_obj = joblib.load(f)
 
-scaler_X = scaler_obj['scaler_X']
-scaler_y = scaler_obj[f'scaler_y_{element_choice}']
-
-# -------------------------------
-# Step 5: Define features
-# -------------------------------
-# Must match what was used during training
+# Manually define features used in training
 feature_columns = [
     'O3_forecast', 'NO2_forecast', 'T_forecast', 'q_forecast',
     'u_forecast', 'v_forecast', 'w_forecast',
     'NO2_satellite', 'HCHO_satellite', 'ratio_satellite'
 ]
 
+scaler_X = scaler_obj['scaler_X']
+scaler_y = scaler_obj[f'scaler_y_{element_choice}']
+
 # -------------------------------
-# Step 6: Load data
+# Step 5: Load data
 # -------------------------------
 df = pd.read_csv(data_path)
 
 # -------------------------------
-# Step 7: Prepare recent sequence
+# Step 6: Prepare recent sequence
 # -------------------------------
 def create_recent_sequence(df, feature_columns, time_steps=24):
     """
@@ -79,8 +74,7 @@ def create_recent_sequence(df, feature_columns, time_steps=24):
     """
     return df[feature_columns].values[-time_steps:].reshape(1, time_steps, -1)
 
-# Step: Prepare recent sequence
-X_input = df[feature_columns].values[-24:].reshape(1, 24, len(feature_columns))
+X_input = create_recent_sequence(df, feature_columns, time_steps=24)
 
 # Flatten for scaler, then reshape back
 X_input_flat = X_input.reshape(-1, len(feature_columns))
@@ -91,11 +85,10 @@ X_input_scaled = X_input_scaled_flat.reshape(X_input.shape)
 y_pred_scaled = model.predict(X_input_scaled)
 y_pred = scaler_y.inverse_transform(y_pred_scaled)
 
-
 # -------------------------------
-# Step 9: Display results
+# Step 7: Display results
 # -------------------------------
-st.subheader(f"Next 24h {element_choice} prediction for {site_choice} ({model_choice})")
+st.subheader(f"Next 24h {element_choice} prediction for {site_choice} (LSTM)")
 
 prediction_df = pd.DataFrame({
     "Hour": np.arange(1, 25),
@@ -104,4 +97,3 @@ prediction_df = pd.DataFrame({
 
 st.line_chart(prediction_df.set_index("Hour"))
 st.dataframe(prediction_df)
-
