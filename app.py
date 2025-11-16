@@ -75,31 +75,30 @@ if not os.path.exists(data_path):
     st.error(f"Data file not found: {data_path}")
     st.stop()
 
+# Clean CSV column names
 df = pd.read_csv(data_path)
+df.columns = df.columns.str.strip()  # remove any spaces
 
-# -----------------------------
-# Step 7: Prepare recent sequence
-# -----------------------------
-def create_recent_sequence(df, input_features, time_steps=24):
-    """
-    Pull the most recent data (last 'time_steps' rows) for the given features.
-    Returns: shape (1, time_steps, num_features)
-    """
-    return df[input_features].values[-time_steps:].reshape(1, time_steps, -1)
+# Use forecast & satellite columns as LSTM input
+input_features = [
+    'O3_forecast', 'NO2_forecast', 'T_forecast', 'q_forecast',
+    'u_forecast', 'v_forecast', 'w_forecast', 'NO2_satellite',
+    'HCHO_satellite', 'ratio_satellite'
+]
 
-# Adjust input_features to match your CSV columns
-input_features = ['O3', 'NO2', 'PM2.5', 'PM10']  
+# Select target dynamically based on element_choice
+target_column = f"{element_choice}_target"
 
+# Create recent sequence
 X_input = create_recent_sequence(df, input_features)
 
-# Scale the input
+# Scale input
 X_input_scaled = scaler_X.transform(X_input.reshape(-1, X_input.shape[-1])).reshape(X_input.shape)
 
-# -----------------------------
-# Step 8: Predict
-# -----------------------------
+# Predict
 y_pred_scaled = model.predict(X_input_scaled)
 y_pred = scaler_y.inverse_transform(y_pred_scaled)
+
 
 # -----------------------------
 # Step 9: Display predictions
@@ -113,4 +112,5 @@ prediction_df = pd.DataFrame({
 
 st.line_chart(prediction_df.set_index("Hour"))
 st.dataframe(prediction_df)
+
 
