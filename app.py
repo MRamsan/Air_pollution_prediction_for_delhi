@@ -48,20 +48,24 @@ data_path = os.path.join("Data", f"site_{site_num}_train_data.csv")
 model = load_model(model_path, compile=False)
 with open(scaler_path, 'rb') as f:
     scaler_obj = joblib.load(f)
-scaler_X = scaler_obj['scaler_X']
-scaler_y = scaler_obj[f'scaler_y_{element_choice}']
 
-# For prediction: use your latest available inputs (or build as in your training phase)
+# Extract input and output scalers
+scaler_X = scaler_obj['scaler_X']
+scaler_y = scaler_obj[f'scaler_y_{element_choice}']  # dynamic for selected element
+
 def create_recent_sequence(df, input_features, time_steps=24):
-    # Implement this to pull the most recent data (last 24 rows/features for a site)
-    # The result: shape (1, time_steps, num_features)
-    # Example:
+    """
+    Pull the most recent data (last 'time_steps' rows) for the given features.
+    Returns: shape (1, time_steps, num_features)
+    """
     return df[input_features].values[-time_steps:].reshape(1, time_steps, -1)
+
 
 input_features = ['O3', 'NO2', 'PM2.5', 'PM10']  # adjust to your CSV
 
-# Prepare recent sequence
 X_input = create_recent_sequence(df, input_features)
+
+# Flatten for scaler, then reshape back
 X_input_scaled = scaler_X.transform(X_input.reshape(-1, X_input.shape[-1])).reshape(X_input.shape)
 y_pred_scaled = model.predict(X_input_scaled)
 y_pred = scaler_y.inverse_transform(y_pred_scaled)
@@ -78,6 +82,7 @@ st.dataframe(prediction_df)
 
 
 # 6
+
 
 
 
