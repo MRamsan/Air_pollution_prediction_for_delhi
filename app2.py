@@ -567,7 +567,7 @@ If you do wear one, N95 masks offer the best protection."""
 💡 **Tip:** Run a forecast first for personalized recommendations!"""
 
 # ============== MAIN UI ==============
-st.title("🌆 Delhi Air Quality Forecast & AI Assistant")
+st.title("Delhi Air Quality Forecast & AI Assistant")
 
 # Create tabs
 tab1, tab2 = st.tabs(["📊 Forecast", "💬 AI Assistant"])
@@ -646,7 +646,7 @@ with tab1:
     input_features = feature_info['input_features']
     sequence_length = feature_info['sequence_length']
 
-    st.info(f"Model uses {len(input_features)} features and {sequence_length} hour sequence")
+
 
     # Run Forecast
     if st.button("🚀 Run Forecast", type="primary"):
@@ -690,7 +690,7 @@ with tab1:
                 st.session_state.forecast_data = forecast_df
                 
                 # Display results
-                st.subheader(f"🎯 {element_choice} Forecast for {site_choice}")
+                st.subheader(f"{element_choice} Forecast for {site_choice}")
                 
                 # Get air quality category
                 avg_value = np.mean(forecasts)
