@@ -7,14 +7,14 @@ import joblib
 from tensorflow.keras.models import load_model
 
 # -------------------------------
-# Step 1: Define options
+# Step 1: Site & Element options
 # -------------------------------
 SITE_NAMES = [
     "Mukherjee Nagar", "Uttam Nagar", "Lajpat Nagar", "Narela", 
     "Patparganj", "Pooth Khurd", "Gokulpuri"
 ]
 SITE_TO_NUM = {name: i+1 for i, name in enumerate(SITE_NAMES)}
-METRIC_NAMES = ["O3", "NO2"]
+ELEMENT_NAMES = ["O3", "NO2"]
 
 # -------------------------------
 # Step 2: Sidebar UI
@@ -22,7 +22,7 @@ METRIC_NAMES = ["O3", "NO2"]
 st.title("Delhi Air Pollution Forecaster")
 
 site_choice = st.sidebar.selectbox("Select Site:", SITE_NAMES)
-element_choice = st.sidebar.selectbox("Select Element:", METRIC_NAMES)
+element_choice = st.sidebar.selectbox("Select Element:", ELEMENT_NAMES)
 
 # -------------------------------
 # Step 3: Paths
@@ -49,15 +49,12 @@ model = load_model(model_path, compile=False)
 with open(scaler_path, 'rb') as f:
     scaler_obj = joblib.load(f)
 
-# Manually define features used in training
-feature_columns = [
-    'O3_forecast', 'NO2_forecast', 'T_forecast', 'q_forecast',
-    'u_forecast', 'v_forecast', 'w_forecast',
-    'NO2_satellite', 'HCHO_satellite', 'ratio_satellite'
-]
-
 scaler_X = scaler_obj['scaler_X']
 scaler_y = scaler_obj[f'scaler_y_{element_choice}']
+
+# Features used for LSTM input
+feature_columns = ['year', 'month', 'day', 'hour', 'O3_forecast', 'NO2_forecast',
+                   'T_forecast', 'q_forecast', 'u_forecast', 'v_forecast', 'w_forecast']
 
 # -------------------------------
 # Step 5: Load data
@@ -69,26 +66,28 @@ df = pd.read_csv(data_path)
 # -------------------------------
 def create_recent_sequence(df, feature_columns, time_steps=24):
     """
-    Pull the most recent data (last 'time_steps' rows) for the given features.
-    Returns: shape (1, time_steps, num_features)
+    Pull the most recent 'time_steps' rows for the given features
+    Returns shape: (1, time_steps, num_features)
     """
-    return df[feature_columns].values[-time_steps:].reshape(1, time_steps, -1)
+    return df[feature_columns].values[-time_steps:].reshape(1, time_steps, len(feature_columns))
 
-X_input = create_recent_sequence(df, feature_columns, time_steps=24)
+X_input = create_recent_sequence(df, feature_columns)
 
-# Flatten for scaler, then reshape back
+# Flatten for scaler
 X_input_flat = X_input.reshape(-1, len(feature_columns))
 X_input_scaled_flat = scaler_X.transform(X_input_flat)
 X_input_scaled = X_input_scaled_flat.reshape(X_input.shape)
 
-# Predict
+# -------------------------------
+# Step 7: Predict
+# -------------------------------
 y_pred_scaled = model.predict(X_input_scaled)
 y_pred = scaler_y.inverse_transform(y_pred_scaled)
 
 # -------------------------------
-# Step 7: Display results
+# Step 8: Display results
 # -------------------------------
-st.subheader(f"Next 24h {element_choice} prediction for {site_choice} (LSTM)")
+st.subheader(f"Next 24h {element_choice} prediction for {site_choice}")
 
 prediction_df = pd.DataFrame({
     "Hour": np.arange(1, 25),
