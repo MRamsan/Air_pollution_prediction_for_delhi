@@ -33,8 +33,8 @@ MODEL_DIR = "LSTM Models"
 SCALER_DIR = "scaler"
 DATA_DIR = "Data"
 
-model_file = f"site_{site_num}_{element_choice}_model (1).h5"
-scaler_file = f"site_{site_num}_scalers (1).pkl"
+model_file = f"site_{site_num}_{element_choice}_model.h5"
+scaler_file = f"site_{site_num}_scalers.pkl"
 data_file = f"site_{site_num}_train_data.csv"
 
 model_path = os.path.join(MODEL_DIR, model_file)
@@ -52,40 +52,56 @@ with open(scaler_path, 'rb') as f:
 scaler_X = scaler_obj['scaler_X']
 scaler_y = scaler_obj[f'scaler_y_{element_choice}']
 
-# Features used for LSTM input
-feature_columns = ['year', 'month', 'day', 'hour', 'O3_forecast', 'NO2_forecast',
-                   'T_forecast', 'q_forecast', 'u_forecast', 'v_forecast', 'w_forecast']
-
 # -------------------------------
 # Step 5: Load data
 # -------------------------------
 df = pd.read_csv(data_path)
 
 # -------------------------------
-# Step 6: Prepare recent sequence
+# Step 6: Preprocessing (LSTM notebook style)
+# -------------------------------
+# Create time features if not present
+if not {'year','month','day','hour'}.issubset(df.columns):
+    df['timestamp'] = pd.to_datetime(df[['year','month','day','hour']])
+    df['year'] = df['timestamp'].dt.year
+    df['month'] = df['timestamp'].dt.month
+    df['day'] = df['timestamp'].dt.day
+    df['hour'] = df['timestamp'].dt.hour
+
+# Features used for LSTM input
+feature_columns = ['year', 'month', 'day', 'hour',
+                   'O3_forecast', 'NO2_forecast',
+                   'T_forecast', 'q_forecast', 'u_forecast',
+                   'v_forecast', 'w_forecast']
+
+# Ensure all features exist
+for col in feature_columns:
+    if col not in df.columns:
+        st.error(f"Missing column in CSV: {col}")
+        st.stop()
+
+# -------------------------------
+# Step 7: Create recent 24h sequence
 # -------------------------------
 def create_recent_sequence(df, feature_columns, time_steps=24):
-    """
-    Pull the most recent 'time_steps' rows for the given features
-    Returns shape: (1, time_steps, num_features)
-    """
+    """Prepare last `time_steps` rows as input for LSTM"""
     return df[feature_columns].values[-time_steps:].reshape(1, time_steps, len(feature_columns))
 
 X_input = create_recent_sequence(df, feature_columns)
 
-# Flatten for scaler
+# Flatten and scale
 X_input_flat = X_input.reshape(-1, len(feature_columns))
 X_input_scaled_flat = scaler_X.transform(X_input_flat)
 X_input_scaled = X_input_scaled_flat.reshape(X_input.shape)
 
 # -------------------------------
-# Step 7: Predict
+# Step 8: Predict
 # -------------------------------
 y_pred_scaled = model.predict(X_input_scaled)
 y_pred = scaler_y.inverse_transform(y_pred_scaled)
 
 # -------------------------------
-# Step 8: Display results
+# Step 9: Display results
 # -------------------------------
 st.subheader(f"Next 24h {element_choice} prediction for {site_choice}")
 
