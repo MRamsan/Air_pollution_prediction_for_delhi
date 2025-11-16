@@ -28,7 +28,7 @@ os.environ['TF_CPP_MIN_LOG_LEVEL'] = '3'
 import tensorflow as tf
 from tensorflow.keras.models import load_model
 
-st.set_page_config(page_title="Delhi Air Quality Forecast (GRU)", layout="wide")
+st.set_page_config(page_title="Delhi Air Quality Forecast", layout="wide")
 
 # ============== CONFIG ==============
 BASE_DIR = os.path.dirname(os.path.abspath(__file__)) if __file__ else os.getcwd()
@@ -408,3 +408,4 @@ if st.button("🚀 Run Forecast", type="primary"):
 # Footer
 st.markdown("---")
 st.markdown("**Note:** This model uses Bidirectional GRU with attention mechanism and 48-hour sequences for forecasting.")
+
