@@ -89,6 +89,13 @@ input_features = [
 
 # Target column
 target_column = f"{element_choice}_target"
+# --- Step: Define function first ---
+def create_recent_sequence(df, input_features, time_steps=24):
+    """
+    Pull the most recent data (last 'time_steps' rows) for the given features.
+    Returns: shape (1, time_steps, num_features)
+    """
+    return df[input_features].values[-time_steps:].reshape(1, time_steps, -1)
 
 # --- Create recent sequence ---
 X_input = create_recent_sequence(df, input_features)
@@ -113,6 +120,7 @@ prediction_df = pd.DataFrame({
 
 st.line_chart(prediction_df.set_index("Hour"))
 st.dataframe(prediction_df)
+
 
 
 
