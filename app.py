@@ -79,16 +79,18 @@ def create_recent_sequence(df, feature_columns, time_steps=24):
     """
     return df[feature_columns].values[-time_steps:].reshape(1, time_steps, -1)
 
-X_input = create_recent_sequence(df, feature_columns)
+# Step: Prepare recent sequence
+X_input = df[feature_columns].values[-24:].reshape(1, 24, len(feature_columns))
 
-# -------------------------------
-# Step 8: Scale and predict
-# -------------------------------
 # Flatten for scaler, then reshape back
-X_input_scaled = scaler_X.transform(X_input.reshape(-1, X_input.shape[-1])).reshape(X_input.shape)
+X_input_flat = X_input.reshape(-1, len(feature_columns))
+X_input_scaled_flat = scaler_X.transform(X_input_flat)
+X_input_scaled = X_input_scaled_flat.reshape(X_input.shape)
 
+# Predict
 y_pred_scaled = model.predict(X_input_scaled)
 y_pred = scaler_y.inverse_transform(y_pred_scaled)
+
 
 # -------------------------------
 # Step 9: Display results
@@ -102,3 +104,4 @@ prediction_df = pd.DataFrame({
 
 st.line_chart(prediction_df.set_index("Hour"))
 st.dataframe(prediction_df)
+
