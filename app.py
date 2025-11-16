@@ -238,7 +238,7 @@ def load_model_components(site_num, element):
         return None, None, None, None, f"Error loading files: {str(e)}\n{traceback.format_exc()}"
 
 # ============== UI ==============
-st.title("🌆 Delhi Air Quality Forecast (GRU)")
+st.title("Delhi Air Quality Forecast ")
 st.markdown("Forecast O3 and NO2 concentrations using pre-trained GRU models with advanced feature engineering.")
 
 # Sidebar
@@ -262,14 +262,14 @@ with st.spinner("Loading and preprocessing data..."):
         df_raw = pd.read_csv(data_path)
         df_processed = preprocess_raw_data(df_raw)
         df_features = engineer_features(df_processed)
-        st.success(f"✅ Loaded {len(df_features)} records from {data_file}")
+        st.success(f"Loaded {len(df_features)} records from {data_file}")
     except Exception as e:
         st.error(f"Error loading data: {str(e)}")
         st.stop()
 
 # Display historical data
 if 'O3_target' in df_features.columns and 'NO2_target' in df_features.columns:
-    st.subheader(f"📊 Historical Data: {site_choice}")
+    st.subheader(f"Historical Data: {site_choice}")
     
     # Show last 7 days
     last_week = df_features.tail(168)  # 24 hours * 7 days
@@ -302,7 +302,7 @@ if model is None:
     st.write(f"**Error details:** {error_path}")
     
     # Show directory structure for debugging
-    with st.expander("🔍 Debug: Show available files"):
+    with st.expander("Debug: Show available files"):
         for dir_name, dir_path in [("Models", MODELS_DIR), ("Scalers", SCALER_DIR), ("Features", FEATURES_DIR)]:
             if os.path.exists(dir_path):
                 files = os.listdir(dir_path)
@@ -312,7 +312,7 @@ if model is None:
                 st.write(f"**{dir_name} folder:** Not found at {dir_path}")
     st.stop()
 
-st.success(f"✅ Loaded GRU model for Site {site_num}")
+st.success(f"Loaded GRU model for Site {site_num}")
 
 # Get feature columns and sequence length
 input_features = feature_info['input_features']
@@ -321,7 +321,7 @@ sequence_length = feature_info['sequence_length']
 st.info(f"Model uses {len(input_features)} features and {sequence_length} hour sequence")
 
 # Run Forecast
-if st.button("🚀 Run Forecast", type="primary"):
+if st.button("Run Forecast", type="primary"):
     with st.spinner("Generating forecast..."):
         try:
             # Ensure all required features are present
@@ -408,4 +408,5 @@ if st.button("🚀 Run Forecast", type="primary"):
 # Footer
 st.markdown("---")
 st.markdown("**Note:** This model uses Bidirectional GRU with attention mechanism and 48-hour sequences for forecasting.")
+
 
