@@ -176,20 +176,77 @@ def create_sequences(data, feature_cols, seq_length=48):
 
 def load_model_components(site_num, element):
     """Load model, scalers, and feature definitions"""
-    # File paths
-    model_path = os.path.join(MODELS_DIR, f"improved_gru_model_site_{site_num}.h5")
-    scaler_x_path = os.path.join(SCALER_DIR, f"improved_scaler_X_site_{site_num}.pkl")
-    scaler_y_path = os.path.join(SCALER_DIR, f"improved_scaler_y_site_{site_num}.pkl")
-    features_path = os.path.join(FEATURES_DIR, f"improved_features_site_{site_num}.pkl")
+    # Try multiple file naming patterns
+    model_patterns = [
+        f"improved_gru_model_site_{site_num}.h5",
+        f"improved_gru_model_site_{site_num}.keras",
+        f"site_{site_num}_{element}_model.h5",
+        f"site_{site_num}_{element}_model (1).h5",
+        f"best_improved_model_site_{site_num}.keras",
+        f"best_improved_model_site_{site_num}.h5"
+    ]
     
-    # Check existence
-    missing_files = []
-    for path in [model_path, scaler_x_path, scaler_y_path, features_path]:
-        if not os.path.exists(path):
-            missing_files.append(path)
+    scaler_patterns = [
+        (f"improved_scaler_X_site_{site_num}.pkl", f"improved_scaler_y_site_{site_num}.pkl"),
+        (f"site_{site_num}_scalers.pkl", f"site_{site_num}_scalers.pkl"),
+        (f"site_{site_num}_scalers (1).pkl", f"site_{site_num}_scalers (1).pkl")
+    ]
     
-    if missing_files:
-        return None, None, None, None, missing_files[0]
+    features_patterns = [
+        f"improved_features_site_{site_num}.pkl",
+        f"features_site_{site_num}.pkl"
+    ]
+    
+    # Find model file
+    model_path = None
+    for pattern in model_patterns:
+        test_path = os.path.join(MODELS_DIR, pattern)
+        if os.path.exists(test_path):
+            model_path = test_path
+            break
+    
+    if not model_path:
+        # List available files in models directory
+        if os.path.exists(MODELS_DIR):
+            available = os.listdir(MODELS_DIR)
+            return None, None, None, None, f"Model not found. Available files: {available}"
+        return None, None, None, None, f"Models directory not found: {MODELS_DIR}"
+    
+    # Find scaler files
+    scaler_x_path = None
+    scaler_y_path = None
+    for x_pattern, y_pattern in scaler_patterns:
+        x_test = os.path.join(SCALER_DIR, x_pattern)
+        y_test = os.path.join(SCALER_DIR, y_pattern)
+        
+        # Handle case where both scalers are in one file
+        if os.path.exists(x_test):
+            scaler_x_path = x_test
+            if x_pattern == y_pattern:  # Same file contains both
+                scaler_y_path = x_test
+            elif os.path.exists(y_test):
+                scaler_y_path = y_test
+            break
+    
+    if not scaler_x_path:
+        if os.path.exists(SCALER_DIR):
+            available = os.listdir(SCALER_DIR)
+            return None, None, None, None, f"Scalers not found. Available files: {available}"
+        return None, None, None, None, f"Scaler directory not found: {SCALER_DIR}"
+    
+    # Find features file
+    features_path = None
+    for pattern in features_patterns:
+        test_path = os.path.join(FEATURES_DIR, pattern)
+        if os.path.exists(test_path):
+            features_path = test_path
+            break
+    
+    if not features_path:
+        if os.path.exists(FEATURES_DIR):
+            available = os.listdir(FEATURES_DIR)
+            return None, None, None, None, f"Features not found. Available files: {available}"
+        return None, None, None, None, f"Features directory not found: {FEATURES_DIR}"
     
     try:
         # Load model with custom objects if needed
@@ -197,9 +254,23 @@ def load_model_components(site_num, element):
         
         # Load scalers
         with open(scaler_x_path, 'rb') as f:
-            scaler_X = pickle.load(f)
-        with open(scaler_y_path, 'rb') as f:
-            scaler_y = pickle.load(f)
+            scaler_obj = pickle.load(f)
+        
+        # Handle different scaler formats
+        if isinstance(scaler_obj, dict):
+            # Dictionary format with 'scaler_X' and 'scaler_y_O3'/'scaler_y_NO2'
+            scaler_X = scaler_obj.get('scaler_X', scaler_obj)
+            scaler_y = scaler_obj.get(f'scaler_y_{element}', scaler_obj.get('scaler_y'))
+        else:
+            # Direct scaler object
+            scaler_X = scaler_obj
+            
+            # Load separate y scaler if different file
+            if scaler_y_path != scaler_x_path:
+                with open(scaler_y_path, 'rb') as f:
+                    scaler_y = pickle.load(f)
+            else:
+                scaler_y = scaler_X  # Same scaler for both
         
         # Load feature definitions
         with open(features_path, 'rb') as f:
@@ -207,7 +278,7 @@ def load_model_components(site_num, element):
         
         return model, scaler_X, scaler_y, feature_info, None
     except Exception as e:
-        return None, None, None, None, str(e)
+        return None, None, None, None, f"Error loading files: {str(e)}"
 
 # ============== UI ==============
 st.title("🌆 Delhi Air Quality Forecast (GRU)")
@@ -266,11 +337,22 @@ if 'O3_target' in df_features.columns and 'NO2_target' in df_features.columns:
         plt.close()
 
 # Load model components
-model, scaler_X, scaler_y, feature_info, error_path = load_model_components(site_num, element_choice)
+with st.spinner("Loading model..."):
+    model, scaler_X, scaler_y, feature_info, error_path = load_model_components(site_num, element_choice)
 
 if model is None:
     st.error(f"❌ Model components not found for Site {site_num}")
-    st.write(f"Missing file: {error_path}")
+    st.write(f"**Error details:** {error_path}")
+    
+    # Show directory structure for debugging
+    with st.expander("🔍 Debug: Show available files"):
+        for dir_name, dir_path in [("Models", MODELS_DIR), ("Scalers", SCALER_DIR), ("Features", FEATURES_DIR)]:
+            if os.path.exists(dir_path):
+                files = os.listdir(dir_path)
+                st.write(f"**{dir_name} folder ({dir_path}):**")
+                st.write(files if files else "Empty folder")
+            else:
+                st.write(f"**{dir_name} folder:** Not found at {dir_path}")
     st.stop()
 
 st.success(f"✅ Loaded GRU model for Site {site_num}")
