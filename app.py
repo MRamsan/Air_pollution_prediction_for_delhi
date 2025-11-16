@@ -109,19 +109,33 @@ df = preprocess_lstm_df(df1)
 # Step 8: Prepare LSTM input
 # -------------------------------
 feature_columns = [
-    'hour', 'day', 'month', 'weekday',   # <-- add these
+    'hour', 'day', 'month', 'weekday',
     'O3_forecast', 'NO2_forecast', 'T_forecast',
     'q_forecast', 'u_forecast', 'v_forecast', 'w_forecast'
 ]
+
+# Fill missing time features if they don't exist
+for col in ['hour','day','month','weekday']:
+    if col not in df.columns:
+        df[col] = 0  # or any placeholder / forward-fill
+
+# Drop rows with NaNs in these features
+df = df.dropna(subset=feature_columns)
 
 
 def create_recent_sequence(df, feature_columns, time_steps=24):
     return df[feature_columns].values[-time_steps:].reshape(1, time_steps, len(feature_columns))
 
-X_input = create_recent_sequence(df, feature_columns)
+time_steps = 24
+if len(df) < time_steps:
+    st.error(f"Not enough data to predict. Need at least {time_steps} rows.")
+    st.stop()
+
+X_input = df[feature_columns].values[-time_steps:].reshape(1, time_steps, len(feature_columns))
 X_input_flat = X_input.reshape(-1, len(feature_columns))
-X_input_scaled_flat = scaler_X.transform(X_input_flat)  # now matches scaler
+X_input_scaled_flat = scaler_X.transform(X_input_flat)
 X_input_scaled = X_input_scaled_flat.reshape(X_input.shape)
+
 
 
 # -------------------------------
@@ -142,3 +156,4 @@ prediction_df = pd.DataFrame({
 
 st.line_chart(prediction_df.set_index("Hour"))
 st.dataframe(prediction_df)
+
