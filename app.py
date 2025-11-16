@@ -6,81 +6,108 @@ import os
 import joblib
 from tensorflow.keras.models import load_model
 
-# ---------------- Step 1: Define options ----------------
+# -------------------------------
+# Step 1: Define options
+# -------------------------------
 SITE_NAMES = [
-    "Mukherjee Nagar", "Uttam Nagar", "Lajpat Nagar", "Narela",
+    "Mukherjee Nagar", "Uttam Nagar", "Lajpat Nagar", "Narela", 
     "Patparganj", "Pooth Khurd", "Gokulpuri"
 ]
 SITE_TO_NUM = {name: i+1 for i, name in enumerate(SITE_NAMES)}
 MODEL_NAMES = ["LSTM", "GRU"]
 METRIC_NAMES = ["O3", "NO2"]
 
-# ---------------- Step 2: Sidebar selections ----------------
+# -------------------------------
+# Step 2: Sidebar UI
+# -------------------------------
 st.title("Delhi Air Pollution Forecaster")
+
 site_choice = st.sidebar.selectbox("Select Site:", SITE_NAMES)
 model_choice = st.sidebar.selectbox("Select Model:", MODEL_NAMES)
 element_choice = st.sidebar.selectbox("Select Element:", METRIC_NAMES)
 
-# ---------------- Step 3: Paths ----------------
+# -------------------------------
+# Step 3: File paths
+# -------------------------------
 site_num = SITE_TO_NUM[site_choice]
 
-MODEL_DIR = "LSTM Models"
-SCALER_DIR = "scaler"
 DATA_DIR = "Data"
+SCALER_DIR = "scaler"
+LSTM_DIR = "LSTM Models"
 
-model_key = f"site_{site_num}_{element_choice}_model (1).h5"
-scaler_key = f"site_{site_num}_scalers (1).pkl"
 data_file = f"site_{site_num}_train_data.csv"
-
-model_path = os.path.join(MODEL_DIR, model_key)
-scaler_path = os.path.join(SCALER_DIR, scaler_key)
 data_path = os.path.join(DATA_DIR, data_file)
 
-# ---------------- Step 4: Load model and scaler ----------------
-model = load_model(model_path, compile=False)
+# -------------------------------
+# Step 4: Load model & scaler
+# -------------------------------
+if model_choice == "LSTM":
+    # LSTM from LSTM Models folder
+    model_file = f"site_{site_num}_{element_choice}_model (1).h5"
+    model_path = os.path.join(LSTM_DIR, model_file)
+    model = load_model(model_path, compile=False)
 
-with open(scaler_path, 'rb') as f:
-    scaler_obj = joblib.load(f)
+    # scaler stored in scaler folder
+    scaler_file = f"site_{site_num}_scalers (1).pkl"
+    scaler_path = os.path.join(SCALER_DIR, scaler_file)
+    with open(scaler_path, 'rb') as f:
+        scaler_obj = joblib.load(f)
 
-# Extract scalers and feature order
+elif model_choice == "GRU":
+    # GRU model itself is stored as pickle in scaler folder
+    model_file = f"site_{site_num}_{element_choice}_gru_model.pkl"
+    model_path = os.path.join(SCALER_DIR, model_file)
+    with open(model_path, 'rb') as f:
+        model = joblib.load(f)
+    
+    # GRU scaler is also in scaler folder
+    scaler_file = f"site_{site_num}_gru_scalers.pkl"
+    scaler_path = os.path.join(SCALER_DIR, scaler_file)
+    with open(scaler_path, 'rb') as f:
+        scaler_obj = joblib.load(f)
+
+# Extract scalers and feature columns
 scaler_X = scaler_obj['scaler_X']
 scaler_y = scaler_obj[f'scaler_y_{element_choice}']
-input_features = scaler_obj.get('feature_columns')  # exact feature order
+feature_columns = scaler_obj['feature_columns']  # must be saved during training
 
-if input_features is None:
-    st.error("Scaler object does not contain 'feature_columns'. Please save feature columns during training.")
-    st.stop()
-
-# ---------------- Step 5: Load data ----------------
+# -------------------------------
+# Step 5: Load data
+# -------------------------------
 df = pd.read_csv(data_path)
 
-# ---------------- Step 6: Prepare input sequence ----------------
+# -------------------------------
+# Step 6: Prepare recent sequence
+# -------------------------------
 def create_recent_sequence(df, input_features, time_steps=24):
     """
-    Pulls the most recent 'time_steps' rows of features for prediction.
-    Returns shape (1, time_steps, num_features)
+    Pull the most recent data (last 'time_steps' rows) for the given features.
+    Returns: shape (1, time_steps, num_features)
     """
-    # Ensure we have enough rows
-    if len(df) < time_steps:
-        raise ValueError(f"Data has only {len(df)} rows, but {time_steps} required for sequence.")
-    
     return df[input_features].values[-time_steps:].reshape(1, time_steps, -1)
 
-# Create input sequence
-try:
-    X_input = create_recent_sequence(df, input_features)
-except Exception as e:
-    st.error(f"Error creating input sequence: {e}")
-    st.stop()
+input_features = feature_columns
+X_input = create_recent_sequence(df, input_features)
 
-# Scale input
+# -------------------------------
+# Step 7: Scale input
+# -------------------------------
 X_input_scaled = scaler_X.transform(X_input.reshape(-1, X_input.shape[-1])).reshape(X_input.shape)
 
-# ---------------- Step 7: Make prediction ----------------
-y_pred_scaled = model.predict(X_input_scaled)
+# -------------------------------
+# Step 8: Prediction
+# -------------------------------
+if model_choice == "LSTM":
+    y_pred_scaled = model.predict(X_input_scaled)
+else:  # GRU
+    # GRU model might need flattened input
+    y_pred_scaled = model.predict(X_input_scaled.reshape(X_input_scaled.shape[0], -1))
+
 y_pred = scaler_y.inverse_transform(y_pred_scaled)
 
-# ---------------- Step 8: Display predictions ----------------
+# -------------------------------
+# Step 9: Display predictions
+# -------------------------------
 st.subheader(f"Next 24h {element_choice} prediction for {site_choice} ({model_choice})")
 
 prediction_df = pd.DataFrame({
