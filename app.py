@@ -33,9 +33,9 @@ st.set_page_config(page_title="Delhi Air Quality Forecast (GRU)", layout="wide")
 # ============== CONFIG ==============
 BASE_DIR = os.path.dirname(os.path.abspath(__file__)) if __file__ else os.getcwd()
 DATA_DIR = os.path.join(BASE_DIR, "Data")
-SCALER_DIR = os.path.join(BASE_DIR, "scaler")
-FEATURES_DIR = os.path.join(BASE_DIR, "features")
-MODELS_DIR = os.path.join(BASE_DIR, "models")
+SCALER_DIR = os.path.join(BASE_DIR, "scaler_gru")
+FEATURES_DIR = os.path.join(BASE_DIR, "features_gru")
+MODELS_DIR = os.path.join(BASE_DIR, "models_gru")
 
 SITE_NAMES = [
     "Mukherjee Nagar", "Uttam Nagar", "Lajpat Nagar", "Narela",
@@ -176,109 +176,66 @@ def create_sequences(data, feature_cols, seq_length=48):
 
 def load_model_components(site_num, element):
     """Load model, scalers, and feature definitions"""
-    # Try multiple file naming patterns
-    model_patterns = [
-        f"improved_gru_model_site_{site_num}.h5",
-        f"improved_gru_model_site_{site_num}.keras",
-        f"site_{site_num}_{element}_model.h5",
-        f"site_{site_num}_{element}_model (1).h5",
-        f"best_improved_model_site_{site_num}.keras",
-        f"best_improved_model_site_{site_num}.h5"
-    ]
+    # File paths based on actual structure
+    model_path = os.path.join(MODELS_DIR, f"site_{site_num}_gru_model.h5")
+    scaler_path = os.path.join(SCALER_DIR, f"site_{site_num}_scalers.pkl")
+    features_path = os.path.join(FEATURES_DIR, f"site_{site_num}_features.pkl")
     
-    scaler_patterns = [
-        (f"improved_scaler_X_site_{site_num}.pkl", f"improved_scaler_y_site_{site_num}.pkl"),
-        (f"site_{site_num}_scalers.pkl", f"site_{site_num}_scalers.pkl"),
-        (f"site_{site_num}_scalers (1).pkl", f"site_{site_num}_scalers (1).pkl")
-    ]
+    # Check existence
+    missing_files = []
+    if not os.path.exists(model_path):
+        missing_files.append(f"Model: {model_path}")
+    if not os.path.exists(scaler_path):
+        missing_files.append(f"Scaler: {scaler_path}")
+    if not os.path.exists(features_path):
+        missing_files.append(f"Features: {features_path}")
     
-    features_patterns = [
-        f"improved_features_site_{site_num}.pkl",
-        f"features_site_{site_num}.pkl"
-    ]
-    
-    # Find model file
-    model_path = None
-    for pattern in model_patterns:
-        test_path = os.path.join(MODELS_DIR, pattern)
-        if os.path.exists(test_path):
-            model_path = test_path
-            break
-    
-    if not model_path:
-        # List available files in models directory
-        if os.path.exists(MODELS_DIR):
-            available = os.listdir(MODELS_DIR)
-            return None, None, None, None, f"Model not found. Available files: {available}"
-        return None, None, None, None, f"Models directory not found: {MODELS_DIR}"
-    
-    # Find scaler files
-    scaler_x_path = None
-    scaler_y_path = None
-    for x_pattern, y_pattern in scaler_patterns:
-        x_test = os.path.join(SCALER_DIR, x_pattern)
-        y_test = os.path.join(SCALER_DIR, y_pattern)
-        
-        # Handle case where both scalers are in one file
-        if os.path.exists(x_test):
-            scaler_x_path = x_test
-            if x_pattern == y_pattern:  # Same file contains both
-                scaler_y_path = x_test
-            elif os.path.exists(y_test):
-                scaler_y_path = y_test
-            break
-    
-    if not scaler_x_path:
-        if os.path.exists(SCALER_DIR):
-            available = os.listdir(SCALER_DIR)
-            return None, None, None, None, f"Scalers not found. Available files: {available}"
-        return None, None, None, None, f"Scaler directory not found: {SCALER_DIR}"
-    
-    # Find features file
-    features_path = None
-    for pattern in features_patterns:
-        test_path = os.path.join(FEATURES_DIR, pattern)
-        if os.path.exists(test_path):
-            features_path = test_path
-            break
-    
-    if not features_path:
-        if os.path.exists(FEATURES_DIR):
-            available = os.listdir(FEATURES_DIR)
-            return None, None, None, None, f"Features not found. Available files: {available}"
-        return None, None, None, None, f"Features directory not found: {FEATURES_DIR}"
+    if missing_files:
+        return None, None, None, None, "\n".join(missing_files)
     
     try:
-        # Load model with custom objects if needed
+        # Load model
         model = load_model(model_path, compile=False)
         
-        # Load scalers
-        with open(scaler_x_path, 'rb') as f:
+        # Load scalers (they are in a dictionary format)
+        with open(scaler_path, 'rb') as f:
             scaler_obj = pickle.load(f)
         
         # Handle different scaler formats
         if isinstance(scaler_obj, dict):
             # Dictionary format with 'scaler_X' and 'scaler_y_O3'/'scaler_y_NO2'
-            scaler_X = scaler_obj.get('scaler_X', scaler_obj)
-            scaler_y = scaler_obj.get(f'scaler_y_{element}', scaler_obj.get('scaler_y'))
-        else:
-            # Direct scaler object
-            scaler_X = scaler_obj
+            scaler_X = scaler_obj.get('scaler_X', None)
+            scaler_y = scaler_obj.get(f'scaler_y_{element}', None)
             
-            # Load separate y scaler if different file
-            if scaler_y_path != scaler_x_path:
-                with open(scaler_y_path, 'rb') as f:
-                    scaler_y = pickle.load(f)
-            else:
-                scaler_y = scaler_X  # Same scaler for both
+            if scaler_X is None or scaler_y is None:
+                # Try alternative key names
+                scaler_X = scaler_obj.get('X', scaler_obj.get('input', list(scaler_obj.values())[0]))
+                scaler_y = scaler_obj.get(element, scaler_obj.get('y', scaler_obj.get('output', list(scaler_obj.values())[1] if len(scaler_obj) > 1 else scaler_X)))
+        else:
+            # If it's not a dict, use the same scaler for both
+            scaler_X = scaler_obj
+            scaler_y = scaler_obj
         
         # Load feature definitions
         with open(features_path, 'rb') as f:
             feature_info = pickle.load(f)
         
+        # Ensure feature_info has required keys
+        if not isinstance(feature_info, dict):
+            feature_info = {
+                'input_features': feature_info,
+                'target_features': ['O3_target', 'NO2_target'],
+                'sequence_length': 48
+            }
+        
+        if 'sequence_length' not in feature_info:
+            feature_info['sequence_length'] = 48
+        
         return model, scaler_X, scaler_y, feature_info, None
+        
     except Exception as e:
-        return None, None, None, None, f"Error loading files: {str(e)}"
+        import traceback
+        return None, None, None, None, f"Error loading files: {str(e)}\n{traceback.format_exc()}"
 
 # ============== UI ==============
 st.title("🌆 Delhi Air Quality Forecast (GRU)")
