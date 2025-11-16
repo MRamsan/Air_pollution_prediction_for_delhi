@@ -16,7 +16,7 @@ SITE_NAMES = [
     "Patparganj", "Pooth Khurd", "Gokulpuri"
 ]
 SITE_TO_NUM = {name: i+1 for i, name in enumerate(SITE_NAMES)}
-MODEL_NAMES = ["LSTM", "GRU", "RandomForest", "XGBoost"]
+MODEL_NAMES = ["LSTM", "GRU"]
 METRIC_NAMES = ["O3", "NO2"]
 
 
@@ -41,19 +41,15 @@ model_key = f"site_{site_num}_{element_choice}_model (1).h5"
 scaler_key = f"site_{site_num}_scalers (1).pkl"
 
 model_path = os.path.join(MODEL_DIR, model_key)
-scaler_path = os.path.join("scaler.pkl", scaler_key)
+scaler_path = os.path.join("scaler", scaler_key)
 data_path = os.path.join("Data", f"site_{site_num}_train_data.csv")
 
 # Load model and scaler
-model = load_model(model_path)
+model = load_model(model_path, compile=False)
 with open(scaler_path, 'rb') as f:
     scaler_obj = joblib.load(f)
 scaler_X = scaler_obj['scaler_X']
 scaler_y = scaler_obj[f'scaler_y_{element_choice}']
-
-
-#Step 4: Data Loading, Preprocessing, and Prediction
-
 
 # For prediction: use your latest available inputs (or build as in your training phase)
 def create_recent_sequence(df, input_features, time_steps=24):
@@ -62,13 +58,13 @@ def create_recent_sequence(df, input_features, time_steps=24):
     # Example:
     return df[input_features].values[-time_steps:].reshape(1, time_steps, -1)
 
-df = pd.read_csv(data_path)
-X_input = create_recent_sequence(df, input_features)
+input_features = ['O3', 'NO2', 'PM2.5', 'PM10']  # adjust to your CSV
 
+# Prepare recent sequence
+X_input = create_recent_sequence(df, input_features)
 X_input_scaled = scaler_X.transform(X_input.reshape(-1, X_input.shape[-1])).reshape(X_input.shape)
 y_pred_scaled = model.predict(X_input_scaled)
 y_pred = scaler_y.inverse_transform(y_pred_scaled)
-
 
 #Step 5: Displaying predictions (1 value per hour)
 # Display predictions as dataframe or chart
@@ -82,6 +78,7 @@ st.dataframe(prediction_df)
 
 
 # 6
+
 
 
 
