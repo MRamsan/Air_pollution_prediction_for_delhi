@@ -74,10 +74,8 @@ df = pd.read_csv(data_path)
 # Step 7: Preprocessing for LSTM
 # -------------------------------
 feature_columns = [
-    'year', 'month', 'day', 'hour',
-    'O3_forecast', 'NO2_forecast',
-    'T_forecast', 'q_forecast',
-    'u_forecast', 'v_forecast', 'w_forecast'
+    'O3_forecast', 'NO2_forecast', 'T_forecast', 
+    'q_forecast', 'u_forecast', 'v_forecast', 'w_forecast'
 ]
 
 # Function to get last 24-hour sequence
@@ -89,7 +87,7 @@ def create_recent_sequence(df, feature_columns, time_steps=24):
 
 X_input = create_recent_sequence(df, feature_columns)
 
-# Flatten for scaling, then reshape back
+# Flatten for scaler
 X_input_flat = X_input.reshape(-1, len(feature_columns))
 X_input_scaled_flat = scaler_X.transform(X_input_flat)
 X_input_scaled = X_input_scaled_flat.reshape(X_input.shape)
@@ -112,3 +110,4 @@ prediction_df = pd.DataFrame({
 
 st.line_chart(prediction_df.set_index("Hour"))
 st.dataframe(prediction_df)
+
