@@ -76,26 +76,27 @@ if not os.path.exists(data_path):
     st.stop()
 
 # Clean CSV column names
+# --- Load CSV first ---
 df = pd.read_csv(data_path)
-df.columns = df.columns.str.strip()  # remove any spaces
+df.columns = df.columns.str.strip()  # clean column names
 
-# Use forecast & satellite columns as LSTM input
+# --- Set input features based on your CSV ---
 input_features = [
     'O3_forecast', 'NO2_forecast', 'T_forecast', 'q_forecast',
     'u_forecast', 'v_forecast', 'w_forecast', 'NO2_satellite',
     'HCHO_satellite', 'ratio_satellite'
 ]
 
-# Select target dynamically based on element_choice
+# Target column
 target_column = f"{element_choice}_target"
 
-# Create recent sequence
+# --- Create recent sequence ---
 X_input = create_recent_sequence(df, input_features)
 
-# Scale input
+# --- Scale input ---
 X_input_scaled = scaler_X.transform(X_input.reshape(-1, X_input.shape[-1])).reshape(X_input.shape)
 
-# Predict
+# --- Predict ---
 y_pred_scaled = model.predict(X_input_scaled)
 y_pred = scaler_y.inverse_transform(y_pred_scaled)
 
@@ -112,5 +113,6 @@ prediction_df = pd.DataFrame({
 
 st.line_chart(prediction_df.set_index("Hour"))
 st.dataframe(prediction_df)
+
 
 
