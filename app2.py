@@ -240,12 +240,14 @@ def generate_recommendations(forecast_data, site, pollutant):
     
     category, emoji = get_air_quality_category(avg_value, pollutant)
     
+    forecast_hours = len(forecast_data)
+    
     recommendations = f"""
 📍 **Location:** {site}
 🔬 **Pollutant:** {pollutant}
 {emoji} **Air Quality:** {category}
 
-**24-Hour Forecast Summary:**
+**{forecast_hours}-Hour Forecast Summary:**
 - Average: {avg_value:.2f} µg/m³
 - Peak: {max_value:.2f} µg/m³ (Hour {forecast_data[f"{pollutant} (µg/m³)"].idxmax() + 1})
 - Lowest: {min_value:.2f} µg/m³ (Hour {forecast_data[f"{pollutant} (µg/m³)"].idxmin() + 1})
@@ -565,7 +567,7 @@ If you do wear one, N95 masks offer the best protection."""
 💡 **Tip:** Run a forecast first for personalized recommendations!"""
 
 # ============== MAIN UI ==============
-st.title("Delhi Air Quality Forecast & AI Assistant")
+st.title("🌆 Delhi Air Quality Forecast & AI Assistant")
 
 # Create tabs
 tab1, tab2 = st.tabs(["📊 Forecast", "💬 AI Assistant"])
@@ -574,7 +576,7 @@ tab1, tab2 = st.tabs(["📊 Forecast", "💬 AI Assistant"])
 st.sidebar.header("Configuration")
 site_choice = st.sidebar.selectbox("Select Monitoring Site", SITE_NAMES)
 element_choice = st.sidebar.selectbox("Select Pollutant", ELEMENT_NAMES)
-forecast_hours = st.sidebar.slider("Forecast Hours Ahead", 1, 24, 24)
+forecast_hours = st.sidebar.slider("Forecast Hours Ahead", 1, 48, 48)
 
 site_num = SITE_TO_NUM[site_choice]
 
@@ -600,7 +602,7 @@ with tab1:
             df_raw = pd.read_csv(data_path)
             df_processed = preprocess_raw_data(df_raw)
             df_features = engineer_features(df_processed)
-            st.success(f"Loaded {len(df_features)} records from {data_file}")
+            st.success(f"✅ Loaded {len(df_features)} records from {data_file}")
         except Exception as e:
             st.error(f"Error loading data: {str(e)}")
             st.stop()
@@ -639,7 +641,7 @@ with tab1:
         st.write(f"**Error details:** {error_path}")
         st.stop()
 
-   # st.success(f"✅ Loaded GRU model for Site {site_num}")
+    st.success(f"✅ Loaded GRU model for Site {site_num}")
 
     input_features = feature_info['input_features']
     sequence_length = feature_info['sequence_length']
@@ -647,7 +649,7 @@ with tab1:
     st.info(f"Model uses {len(input_features)} features and {sequence_length} hour sequence")
 
     # Run Forecast
-    if st.button("Run Forecast", type="primary"):
+    if st.button("🚀 Run Forecast", type="primary"):
         with st.spinner("Generating forecast..."):
             try:
                 missing_features = [f for f in input_features if f not in df_features.columns]
@@ -696,7 +698,7 @@ with tab1:
                 
                 col1, col2, col3 = st.columns(3)
                 col1.metric("Next Hour", f"{forecasts[0]:.2f} µg/m³")
-                col2.metric("24h Average", f"{avg_value:.2f} µg/m³")
+                col2.metric(f"{forecast_hours}h Average", f"{avg_value:.2f} µg/m³")
                 col3.metric("Air Quality", f"{emoji} {category}")
                 
                 # Plot
@@ -715,7 +717,7 @@ with tab1:
                 plt.close()
                 
                 # Show table
-                st.subheader("Forecast Data")
+                st.subheader("📋 Forecast Data")
                 st.dataframe(forecast_df.style.format({f"{element_choice} (µg/m³)": "{:.2f}"}))
                 
                 # Download button
@@ -727,7 +729,7 @@ with tab1:
                     mime="text/csv"
                 )
                 
-                st.success(f"Forecast complete! You can now ask the AI Assistant for recommendations in the next tab.")
+                st.success(f"✅ Forecast complete! You can now ask the AI Assistant for recommendations in the next tab.")
                 
             except Exception as e:
                 st.error(f"Error during forecasting: {str(e)}")
@@ -846,7 +848,7 @@ with tab2:
     # Show current forecast summary in sidebar
     if st.session_state.forecast_data is not None:
         st.sidebar.markdown("---")
-        st.sidebar.markdown("###  Current Forecast")
+        st.sidebar.markdown("### 📊 Current Forecast")
         st.sidebar.markdown(f"**Site:** {st.session_state.current_site}")
         st.sidebar.markdown(f"**Pollutant:** {st.session_state.current_element}")
         
