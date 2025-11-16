@@ -34,7 +34,7 @@ site_num = SITE_TO_NUM[site_choice]
 
 # Set up paths for model & scaler
 MODEL_DIR = "LSTM Models"
-SCALER_DIR = "scaler.pkl"
+SCALER_DIR = "scaler"
 # For LSTM, model file example: site_1_O3_model.h5, scaler: site_1_scalers (1).pkl
 
 model_key = f"site_{site_num}_{element_choice}_model (1).h5"
@@ -82,5 +82,6 @@ st.dataframe(prediction_df)
 
 
 # 6
+
 
 
