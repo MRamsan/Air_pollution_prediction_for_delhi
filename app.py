@@ -1,4 +1,6 @@
 #Step 1: Define your options
+import streamlit as st
+
 # In your app.py
 SITE_NAMES = [
     "Mukherjee Nagar", "Uttam Nagar", "Lajpat Nagar", "Narela", 
@@ -71,3 +73,4 @@ st.dataframe(prediction_df)
 
 
 # 6
+
